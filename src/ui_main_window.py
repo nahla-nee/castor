@@ -37,6 +37,11 @@ class Ui_MainWindow(object):
 
         self.horizontalLayout.addWidget(self.back_button)
 
+        self.forward_button = QPushButton(self.centralwidget)
+        self.forward_button.setObjectName(u"forward_button")
+
+        self.horizontalLayout.addWidget(self.forward_button)
+
         self.refresh_button = QPushButton(self.centralwidget)
         self.refresh_button.setObjectName(u"refresh_button")
 
@@ -65,6 +70,7 @@ class Ui_MainWindow(object):
     def retranslateUi(self, MainWindow):
         MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", u"Castor", None))
         self.back_button.setText(QCoreApplication.translate("MainWindow", u"\u2190", None))
+        self.forward_button.setText(QCoreApplication.translate("MainWindow", u"\u2192", None))
         self.refresh_button.setText(QCoreApplication.translate("MainWindow", u"\u27f3", None))
     # retranslateUi
 

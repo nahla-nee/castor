@@ -40,6 +40,13 @@
        </widget>
       </item>
       <item>
+       <widget class="QPushButton" name="forward_button">
+        <property name="text">
+         <string>→</string>
+        </property>
+       </widget>
+      </item>
+      <item>
        <widget class="QPushButton" name="refresh_button">
         <property name="text">
          <string>⟳</string>
