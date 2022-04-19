@@ -13,27 +13,41 @@ class MainWindow(QMainWindow):
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
 
-        self.current_page = "gemini://gemini.circumlunar.space/"
         self.client = gemini.Client()
-        self.history = []
-
         self.client.set_timeout(5)
-        self.ui.content.setOpenLinks(False)
+
+        self.current_page = "gemini://gemini.circumlunar.space/"
+        self.history = []
+        self.history_index = -1
 
         self.ui.back_button.clicked.connect(self.__handle_back)
-        self.ui.refresh_button.clicked.connect(self.__handle_refresh)
-        self.ui.url_input.editingFinished.connect(self.__handle_url_update)
+        self.ui.forward_button.clicked.connect(self.__handle_forward)
+        self.ui.refresh_button.clicked.connect(lambda: self.__get_page(self.history[self.history_index]))
+        self.ui.url_input.returnPressed.connect(self.__handle_url_update)
+
+        self.ui.content.setOpenLinks(False)
         self.ui.content.anchorClicked.connect(self.__handle_link)
 
         self.ui.url_input.setText(self.current_page)
-        self.__update_page(False)
+        self.__push_to_history(self.current_page)
+        self.__get_page(self.current_page)
 
-    def __update_page(self, update_history: bool):
+    def __get_page(self, url: str):
+        """
+        Attemps to load the page address in url, the url doesn't need to include
+        the scheme, it'll be assumed gemini by default. Popping
+        up an error message to the user if issues occured.
+        """
+
+        if not url.startswith("gemini://"):
+            url = "gemini://" + url
+
         response = ()
         status = ()
         meta = ()
+
         try:
-            response = self.client.request(self.ui.url_input.text())
+            response = self.client.request(url)
             (status, meta) = response.header
         except Exception as err:
             QMessageBox.warning(self, "Failed to acquire resource", str(err))
@@ -44,7 +58,7 @@ class MainWindow(QMainWindow):
             case 10 | 11:
                 self.__handle_input(status, meta)
             case 20:
-                self.__handle_success(meta, response.body, update_history)
+                self.__handle_success(meta, response.body)
             case 30 | 31:
                 self.__handle_redirect(status, meta)
             case 40 | 41 | 42 | 43 | 44:
@@ -54,38 +68,59 @@ class MainWindow(QMainWindow):
             case 60 | 61 | 62:
                 self.__handle_cert_fail(status, meta)
 
-    def __handle_back(self):
-        self.ui.url_input.setText(self.history.pop())
-        self.__update_page(False)
+        enable_back = False if self.history_index == 0 else True
+        enable_forward = False if self.history_index == len(self.history) - 1 else True
 
-    # handle the signal coming from the user pressing the refresh button
-    def __handle_refresh(self):
-        self.__update_page(False)
+        self.ui.back_button.setEnabled(enable_back)
+        self.ui.forward_button.setEnabled(enable_forward)
+        self.ui.url_input.setText(url)
+
+    def __handle_back(self):
+        self.history_index -= 1
+        self.__get_page(self.history[self.history_index])
+
+    def __handle_forward(self):
+        self.history_index += 1
+        self.__get_page(self.history[self.history_index])
+
+    # call this function to properly update the history list
+    def __push_to_history(self, link: str):
+        if self.history_index == len(self.history) - 1:
+            self.history.append(link)
+            self.history_index += 1
+        else:
+            del self.history[self.history_index+1:]
+            self.history.append(link)
+            self.history_index += 1
 
     # handle the signal coming from user pressing enter on the url bar
     def __handle_url_update(self):
-        self.__update_page(True)
+        self.__push_to_history(self.ui.url_input.text())
+        self.__get_page(self.ui.url_input.text())
 
     def __handle_link(self, url: QUrl):
+        target_url = ()
         if url.isRelative():
             base_url = QUrl(self.ui.url_input.text())
-            url = base_url.resolved(url).toString()
-            self.ui.url_input.setText(url)
+            target_url = base_url.resolved(url).toString()
         else:
-            self.ui.url_input.setText(url.toString())
+            target_url = url.toString()
 
-        self.__update_page(True)
+        self.__push_to_history(target_url)
+        self.__get_page(target_url)
 
     def __handle_input(self, status: str, meta: str):
         echo_mode = QLineEdit.EchoMode.Normal if status == 10 else QLineEdit.EchoMode.Password
+
         text, ok = QInputDialog.getText(self, "Server input request",
             "Input request from gemini server\n" + meta, echo_mode)
+
         if ok and text:
             request = self.ui.url_input.text() + "?" + urllib.parse.quote(text)
-            self.ui.url_input.setText(request)
-            self.__update_page(True)
+            self.__push_to_history(request)
+            self.__get_page(request)
 
-    def __handle_success(self, meta: str, body, update_history: bool):
+    def __handle_success(self, meta: str, body):
         if meta == "":
             meta = "text/gemini; charset=utf-8"
 
@@ -94,18 +129,14 @@ class MainWindow(QMainWindow):
         if meta.startswith("text/plaintext"):
             content = bytes(body).decode("utf-8")
         elif meta.startswith("text/gemini"):
-            content = gemini.Gemtext.parse_to_html(bytes(body).decode("utf-8"))
+            content = gemini.Gemtext.to_html(bytes(body).decode("utf-8"))
 
         self.ui.content.setText(content)
-
-        if update_history:
-            self.history.append(self.current_page)
-            self.current_page = self.ui.url_input.text()
 
     def __handle_redirect(self, status: str, meta: str):
         user_confirmation = ()
         # automatically accept simple redirects
-        if meta == self.ui.url_input.text() + "/":
+        if meta == self.ui.url_input.text() + "/" and self.ui.url_input.text()[-1] != "/":
             user_confirmation = True
         else:
             type = "temporarily"
@@ -116,8 +147,8 @@ class MainWindow(QMainWindow):
                 " redirects to \"" + meta + "\". Would you like to proceed?")
 
         if user_confirmation:
-            self.ui.url_input.setText(meta)
-            self.__update_page(False)
+            self.__push_to_history(meta)
+            self.__get_page(meta)
 
     def __handle_temp_fail(self, status: str, meta: str):
         title = ()
