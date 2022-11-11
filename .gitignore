@@ -1,3 +1,1 @@
-src/leda*
-src/__pycache__
-env/
+/target
