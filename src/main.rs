@@ -1,9 +1,9 @@
-use druid::{AppLauncher, WindowDesc, PlatformError};
+use druid::{AppLauncher, PlatformError, WindowDesc};
 
-mod delegate;
 mod controllers;
-mod widgets;
 mod data;
+mod delegate;
+mod widgets;
 
 const DEFAULT_URL: &str = "gemini://gemini.circumlunar.space/";
 

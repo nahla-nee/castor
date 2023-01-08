@@ -2,7 +2,7 @@ use druid::{AppDelegate, Command, DelegateCtx, Env, Handled, Selector, Target};
 
 use crate::data::CastorState;
 
-pub const LINK_CLICKED: Selector::<String> = Selector::<String>::new("link_clicked");
+pub const LINK_CLICKED: Selector<String> = Selector::<String>::new("link_clicked");
 pub const PAGE_LOADED: Selector = Selector::new("page_loaded");
 
 pub struct Delegate;
@@ -21,12 +21,12 @@ impl AppDelegate<CastorState> for Delegate {
             let url = match url::Url::parse(&url) {
                 Ok(url) => url,
                 Err(url::ParseError::RelativeUrlWithoutBase) => {
-                    let base = url::Url::parse(&data.get_current_url())
-                        .expect("Failed to parse base url");
+                    let base =
+                        url::Url::parse(&data.get_current_url()).expect("Failed to parse base url");
                     base.join(url.as_str())
                         .expect("Failed to combine relative url with base url")
-                },
-                _ => panic!("Unexpected return value when parsing url")
+                }
+                _ => panic!("Unexpected return value when parsing url"),
             };
 
             data.load_page(url.as_str().to_string());
