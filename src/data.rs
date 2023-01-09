@@ -71,60 +71,75 @@ impl CastorState {
             .borrow_mut()
             .request(url.clone())
             .expect("Failed to send request");
-        if let gemini::header::StatusCode::Success = result.header.status {
-            if result.header.meta.starts_with("text/gemini") {
-                let body_str = std::str::from_utf8(result.body.as_ref().unwrap())
-                    .expect("Failed to parse result as utf8")
-                    .to_string();
-                let gemtext =
-                    gemini::Gemtext::new(&body_str).expect("Failed to parse body as gemtext");
-
-                let mut rich_text_builder = RichTextBuilder::new();
-                for element in gemtext.elements {
-                    match element {
-                        gemini::gemtext::Element::Text(text) => {
-                            rich_text_builder.push(&(text + "\n"));
-                        }
-                        gemini::gemtext::Element::Link(link, text) => {
-                            rich_text_builder
-                                .push(&(text + "\n"))
-                                .link(delegate::LINK_CLICKED.with(link))
-                                .underline(true)
-                                .text_color(Color::AQUA);
-                        }
-                        gemini::gemtext::Element::Heading(text) => {
-                            rich_text_builder.push(&(text + "\n")).size(28.0);
-                        }
-                        gemini::gemtext::Element::Subheading(text) => {
-                            rich_text_builder.push(&(text + "\n")).size(24.0);
-                        }
-                        gemini::gemtext::Element::Subsubheading(text) => {
-                            rich_text_builder.push(&(text + "\n")).size(20.0);
-                        }
-                        gemini::gemtext::Element::UnorderedList(items) => {
-                            for item in items {
-                                rich_text_builder
-                                    .push(&(String::from(&(String::from("•") + &item + "\n"))));
-                            }
-                        }
-                        gemini::gemtext::Element::BlockQuote(text) => {
-                            rich_text_builder
-                                .push(&(text + "\n"))
-                                .underline(true)
-                                .weight(FontWeight::BOLD);
-                        }
-                        gemini::gemtext::Element::Preformatted(_alt_text, text) => {
-                            rich_text_builder
-                                .push(&(text + "\n"))
-                                .font_family(FontFamily::MONOSPACE);
-                        }
-                    };
+        match result.header.status {
+            gemini::header::StatusCode::Input(code) => {
+                match code {
+                    gemini::header::InputCode::Input => {},
+                    gemini::header::InputCode::Sensitive => todo!(),
                 }
-
-                self.body_content = rich_text_builder.build();
-                self.url = url;
-            }
+            },
+            gemini::header::StatusCode::Success => {
+                if result.header.meta.starts_with("text/gemini") {
+                    let body_str = std::str::from_utf8(result.body.as_ref().unwrap())
+                        .expect("Failed to parse result as utf8")
+                        .to_string();
+                    let gemtext = gemini::Gemtext::new(&body_str)
+                        .expect("Failed to parse body as gemtext");
+    
+                    self.body_content = Self::gemtext_to_rich_text(gemtext);
+                    self.url = url;
+                }
+            },
+            gemini::header::StatusCode::Redirect(_) => todo!(),
+            gemini::header::StatusCode::FailTemporary(_) => todo!(),
+            gemini::header::StatusCode::FailPermanent(_) => todo!(),
+            gemini::header::StatusCode::CertFail(_) => todo!(),
         }
+    }
+
+    fn gemtext_to_rich_text(gemtext: gemini::Gemtext) -> RichText {
+        let mut rich_text_builder = RichTextBuilder::new();
+        for element in gemtext.elements {
+            match element {
+                gemini::gemtext::Element::Text(text) => {
+                    rich_text_builder.push(&(text + "\n"));
+                }
+                gemini::gemtext::Element::Link(link, text) => {
+                    rich_text_builder
+                        .push(&(text + "\n"))
+                        .link(delegate::LINK_CLICKED.with(link))
+                        .underline(true)
+                        .text_color(Color::AQUA);
+                }
+                gemini::gemtext::Element::Heading(text) => {
+                    rich_text_builder.push(&(text + "\n")).size(28.0);
+                }
+                gemini::gemtext::Element::Subheading(text) => {
+                    rich_text_builder.push(&(text + "\n")).size(24.0);
+                }
+                gemini::gemtext::Element::Subsubheading(text) => {
+                    rich_text_builder.push(&(text + "\n")).size(20.0);
+                }
+                gemini::gemtext::Element::UnorderedList(items) => {
+                    for item in items {
+                        rich_text_builder
+                            .push(&(String::from(&(String::from("•") + &item + "\n"))));
+                    }
+                }
+                gemini::gemtext::Element::BlockQuote(text) => {
+                    rich_text_builder
+                        .push(&(text + "\n"))
+                        .underline(true)
+                        .weight(FontWeight::BOLD);
+                }
+                gemini::gemtext::Element::Preformatted(_alt_text, text) => {
+                    rich_text_builder
+                        .push(&(text + "\n"))
+                        .font_family(FontFamily::MONOSPACE);
+                }
+            };
+        }
+        rich_text_builder.build()
     }
 }
 
