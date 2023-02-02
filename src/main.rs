@@ -8,11 +8,10 @@ use async_recursion::async_recursion;
 use glib::{clone, MainContext, PRIORITY_DEFAULT, Sender};
 use gtk::{
     prelude::*, Button, ButtonsType, Entry, MessageDialog, Orientation, ScrolledWindow, TextBuffer,
-    TextTag, TextTagTable, TextView, TextChildAnchor, FileChooserDialog
+    TextTag, TextTagTable, TextView, TextChildAnchor
 };
 use gtk::{Application, ApplicationWindow};
 use gtk4 as gtk;
-use leda::gemini::header::CertFailCode;
 use leda::gemini::{self, gemtext, Gemtext};
 use percent_encoding::utf8_percent_encode;
 
