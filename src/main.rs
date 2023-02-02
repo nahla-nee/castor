@@ -5,10 +5,10 @@ use std::rc::Rc;
 
 use anyhow::{Context, Result};
 use async_recursion::async_recursion;
-use glib::{clone, MainContext, PRIORITY_DEFAULT, Sender};
+use glib::{clone, MainContext, Sender, PRIORITY_DEFAULT};
 use gtk::{
     prelude::*, Button, ButtonsType, Entry, MessageDialog, Orientation, ScrolledWindow, TextBuffer,
-    TextTag, TextTagTable, TextView, TextChildAnchor
+    TextChildAnchor, TextTag, TextTagTable, TextView,
 };
 use gtk::{Application, ApplicationWindow};
 use gtk4 as gtk;
@@ -20,7 +20,7 @@ use percent_encoding::utf8_percent_encode;
 struct Castor {
     current_url: String,
     history: Vec<String>,
-    history_index: usize
+    history_index: usize,
 }
 
 impl Castor {
@@ -28,7 +28,7 @@ impl Castor {
         Castor {
             current_url: String::from(DEFAULT_URL),
             history: vec![String::from(DEFAULT_URL)],
-            history_index: 0
+            history_index: 0,
         }
     }
 }
@@ -142,13 +142,15 @@ fn build_ui(app: &Application) -> Result<ApplicationWindow> {
         }));
     }));
 
-    url_bar.connect_activate(clone!(@strong castor_state, @strong client, @weak page_content, @weak window, @weak forward_button, @weak back_button, @strong tx => move |entry| {
+    url_bar.connect_activate(clone!(@strong castor_state, @strong client, @weak page_content, @weak window,
+        @weak forward_button, @weak back_button, @strong tx => move |entry| {
         let url = entry.buffer().text().to_string();
         forward_button.set_sensitive(false);
         back_button.set_sensitive(true);
 
         let main_context = MainContext::default();
-        main_context.spawn_local(clone!(@strong castor_state, @strong client, @weak page_content, @weak window, @strong tx, @weak entry => async move {
+        main_context.spawn_local(clone!(@strong castor_state, @strong client, @weak page_content,
+            @weak window, @strong tx, @weak entry => async move {
             let ret = load_page(&mut client.borrow_mut(), &mut castor_state.borrow_mut(), url, &page_content, &window, tx.clone()).await;
             if let Some(url) = ret{
                 castor_state.borrow_mut().current_url = url;
@@ -163,7 +165,8 @@ fn build_ui(app: &Application) -> Result<ApplicationWindow> {
         }));
     }));
 
-    back_button.connect_clicked(clone!(@strong castor_state, @strong client, @weak page_content, @weak window, @weak forward_button, @weak url_bar, @strong tx => move |button| {
+    back_button.connect_clicked(clone!(@strong castor_state, @strong client, @weak page_content,
+        @weak window, @weak forward_button, @weak url_bar, @strong tx => move |button| {
         let mut state = castor_state.borrow_mut();
         state.history_index -= 1;
         if state.history_index == 0 {
@@ -173,7 +176,8 @@ fn build_ui(app: &Application) -> Result<ApplicationWindow> {
         let url = state.history[state.history_index].clone();
 
         let main_context = MainContext::default();
-        main_context.spawn_local(clone!(@strong castor_state, @strong client, @weak page_content, @weak window, @strong tx, @weak url_bar => async move {
+        main_context.spawn_local(clone!(@strong castor_state, @strong client, @weak page_content,
+            @weak window, @strong tx, @weak url_bar => async move {
             let ret = load_page(&mut client.borrow_mut(), &mut castor_state.borrow_mut(), url, &page_content, &window, tx.clone()).await;
             if let Some(url) = ret{
                 castor_state.borrow_mut().current_url = url;
@@ -182,7 +186,8 @@ fn build_ui(app: &Application) -> Result<ApplicationWindow> {
         }));
     }));
 
-    forward_button.connect_clicked(clone!(@strong castor_state, @strong client, @weak page_content, @weak window, @weak back_button, @weak url_bar, @strong tx => move |button| {
+    forward_button.connect_clicked(clone!(@strong castor_state, @strong client, @weak page_content,
+        @weak window, @weak back_button, @weak url_bar, @strong tx => move |button| {
         let mut state = castor_state.borrow_mut();
         state.history_index += 1;
         if state.history_index == state.history.len()-1 {
@@ -192,7 +197,8 @@ fn build_ui(app: &Application) -> Result<ApplicationWindow> {
         let url = state.history[state.history_index].clone();
 
         let main_context = MainContext::default();
-        main_context.spawn_local(clone!(@strong castor_state, @strong client, @weak page_content, @weak window, @strong tx, @weak url_bar => async move {
+        main_context.spawn_local(clone!(@strong castor_state, @strong client, @weak page_content,
+            @weak window, @strong tx, @weak url_bar => async move {
             let ret = load_page(&mut client.borrow_mut(), &mut castor_state.borrow_mut(), url, &page_content, &window, tx.clone()).await;
             if let Some(url) = ret{
                 castor_state.borrow_mut().current_url = url;
@@ -201,7 +207,8 @@ fn build_ui(app: &Application) -> Result<ApplicationWindow> {
         }));
     }));
 
-    refresh_button.connect_clicked(clone!(@strong castor_state, @strong client, @weak page_content, @weak window, @strong tx =>  move |_| {
+    refresh_button.connect_clicked(clone!(@strong castor_state, @strong client, @weak page_content,
+        @weak window, @strong tx =>  move |_| {
         let main_context = MainContext::default();
         main_context.spawn_local(clone!(@strong castor_state, @strong client, @weak page_content, @weak window, @strong tx => async move {
             let current_url = &castor_state.borrow().current_url;
@@ -209,12 +216,14 @@ fn build_ui(app: &Application) -> Result<ApplicationWindow> {
         }));
     }));
 
-    rx.attach(None, clone!(@weak forward_button, @weak back_button, @strong client, @strong castor_state, @weak window, @strong tx, @weak url_bar => @default-return Continue(false), move |url| {
+    rx.attach(None, clone!(@weak forward_button, @weak back_button, @strong client, @strong castor_state,
+        @weak window, @strong tx, @weak url_bar => @default-return Continue(false), move |url| {
         forward_button.set_sensitive(false);
         back_button.set_sensitive(true);
 
         let main_context = MainContext::default();
-        main_context.spawn_local(clone!(@strong castor_state, @strong client, @weak page_content, @weak window, @strong tx, @weak url_bar => async move {
+        main_context.spawn_local(clone!(@strong castor_state, @strong client, @weak page_content,
+            @weak window, @strong tx, @weak url_bar => async move {
             let ret = load_page(&mut client.borrow_mut(), &mut castor_state.borrow_mut(), url, &page_content, &window, tx.clone()).await;
             if let Some(url) = ret{
                 castor_state.borrow_mut().current_url = url;
@@ -242,10 +251,7 @@ fn gemtext_to_text_buffer(gemtext: Gemtext, text_view: &TextView, link_tx: Sende
                 buffer.insert_with_tags_by_name(&mut buffer.end_iter(), &text, &["plaintext"]);
             }
             gemtext::Element::Link(url, text) => {
-                let link = Button::builder()
-                    .label(&text)
-                    .tooltip_text(&url)
-                    .build();
+                let link = Button::builder().label(&text).tooltip_text(&url).build();
                 let anchor = TextChildAnchor::new();
                 buffer.insert_child_anchor(&mut buffer.end_iter(), &anchor);
                 text_view.add_child_at_anchor(&link, &anchor);
@@ -295,7 +301,7 @@ enum LoadPageError {
     InvalidUrl(url::ParseError),
     FailTemporary(gemini::header::FailTemporaryCode),
     FailPermanent(gemini::header::FailPermanentCode),
-    CertFail(gemini::header::CertFailCode)
+    CertFail(gemini::header::CertFailCode),
 }
 
 impl std::fmt::Display for LoadPageError {
@@ -303,7 +309,7 @@ impl std::fmt::Display for LoadPageError {
         let to_print = match self {
             LoadPageError::RequestFailure(err) => {
                 format!("Page requgest failed with error: {err}")
-            },
+            }
             LoadPageError::EmptyBody(response) => {
                 match response.header.status {
                     // Input, and Redirect shouldn't be reachable.
@@ -325,26 +331,26 @@ impl std::fmt::Display for LoadPageError {
                         format!("Certificate failure: {}", response.header.status)
                     }
                 }
-            },
+            }
             LoadPageError::NotGemtext(response) => {
                 format!("Response wasn't gemtext. Meta: {}", response.header.meta)
-            },
+            }
             LoadPageError::GemtextParsing(err, _) => {
                 if let gemini::Error::GemtextFormat(_) = err {
                     format!("Gemtext parsing error: {err}")
                 } else {
                     unreachable!()
                 }
-            },
+            }
             LoadPageError::InvalidUrl(err) => {
                 format!("Failed to parse url: {err}")
-            },
+            }
             LoadPageError::FailTemporary(code) => {
                 format!("Temporary failure: {code}")
-            },
+            }
             LoadPageError::FailPermanent(code) => {
                 format!("Permanent failure: {code}")
-            },
+            }
             LoadPageError::CertFail(code) => {
                 format!("Certificate failure: {code}\nCertificates are currently not supported")
             }
@@ -352,7 +358,6 @@ impl std::fmt::Display for LoadPageError {
         write!(f, "{}", to_print)
     }
 }
-
 
 // Returns the url of the page if loaded with no errors, otherwise returns none
 #[async_recursion(?Send)]
@@ -362,7 +367,7 @@ async fn load_page(
     mut url: String,
     text_view: &TextView,
     window: &ApplicationWindow,
-    link_tx: Sender<String>
+    link_tx: Sender<String>,
 ) -> Option<String> {
     if let Err(err) = url::Url::parse(&url) {
         let mut new_url = None;
@@ -405,13 +410,13 @@ async fn load_page(
                         entry_dialog.content_area().append(&entry);
                     }
                 }
-                let url = url.clone() + "?" + &match entry_dialog.run_future().await {
-                    gtk::ResponseType::Ok => {
-                        entry.text().to_string()
-                    },
-                    gtk::ResponseType::Cancel => return None,
-                    _ => unreachable!()
-                };
+                let url = url.clone()
+                    + "?"
+                    + &match entry_dialog.run_future().await {
+                        gtk::ResponseType::Ok => entry.text().to_string(),
+                        gtk::ResponseType::Cancel => return None,
+                        _ => unreachable!(),
+                    };
                 let url = utf8_percent_encode(&url, percent_encoding::NON_ALPHANUMERIC).to_string();
                 load_page(client, state, url, text_view, window, link_tx).await
             }
@@ -421,15 +426,21 @@ async fn load_page(
                         Some(body) => {
                             let text = String::from_utf8_lossy(body);
                             buffer.set_text("");
-                            buffer.insert_with_tags_by_name(&mut buffer.end_iter(), &text, &["plaintext"]);
+                            buffer.insert_with_tags_by_name(
+                                &mut buffer.end_iter(),
+                                &text,
+                                &["plaintext"],
+                            );
                             Some(url)
-                        },
+                        }
                         None => {
                             load_page_error_modal(window, LoadPageError::EmptyBody(response)).await;
                             None
                         }
                     }
-                } else if response.header.meta.starts_with("text/gemini") || response.header.meta.is_empty() {
+                } else if response.header.meta.starts_with("text/gemini")
+                    || response.header.meta.is_empty()
+                {
                     match &response.body {
                         Some(body) => {
                             let text = String::from_utf8_lossy(&body);
@@ -437,7 +448,7 @@ async fn load_page(
                                 Ok(gemtext) => {
                                     gemtext_to_text_buffer(gemtext, &text_view, link_tx);
                                     Some(url)
-                                },
+                                }
                                 Err(err) => {
                                     load_page_error_modal(
                                         window,
@@ -447,7 +458,7 @@ async fn load_page(
                                     None
                                 }
                             }
-                        },
+                        }
                         None => {
                             load_page_error_modal(window, LoadPageError::EmptyBody(response)).await;
                             None
@@ -482,24 +493,31 @@ async fn load_page(
                     }
                 };
                 if matches!(user_response, gtk::ResponseType::Yes) {
-                    load_page(client, state, response.header.meta, text_view, window, link_tx).await
-                }
-                else {
+                    load_page(
+                        client,
+                        state,
+                        response.header.meta,
+                        text_view,
+                        window,
+                        link_tx,
+                    )
+                    .await
+                } else {
                     None
                 }
             }
             gemini::header::StatusCode::FailTemporary(code) => {
                 load_page_error_modal(window, LoadPageError::FailTemporary(code)).await;
                 None
-            },
+            }
             gemini::header::StatusCode::FailPermanent(code) => {
                 load_page_error_modal(window, LoadPageError::FailPermanent(code)).await;
                 None
-            },
+            }
             gemini::header::StatusCode::CertFail(code) => {
                 load_page_error_modal(window, LoadPageError::CertFail(code)).await;
                 None
-            },
+            }
         },
         Err(e) => {
             load_page_error_modal(window, LoadPageError::RequestFailure(e)).await;
