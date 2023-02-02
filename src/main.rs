@@ -8,10 +8,11 @@ use async_recursion::async_recursion;
 use glib::{clone, MainContext, PRIORITY_DEFAULT, Sender};
 use gtk::{
     prelude::*, Button, ButtonsType, Entry, MessageDialog, Orientation, ScrolledWindow, TextBuffer,
-    TextTag, TextTagTable, TextView, TextChildAnchor,
+    TextTag, TextTagTable, TextView, TextChildAnchor, FileChooserDialog
 };
 use gtk::{Application, ApplicationWindow};
 use gtk4 as gtk;
+use leda::gemini::header::CertFailCode;
 use leda::gemini::{self, gemtext, Gemtext};
 use percent_encoding::utf8_percent_encode;
 
@@ -20,7 +21,7 @@ use percent_encoding::utf8_percent_encode;
 struct Castor {
     current_url: String,
     history: Vec<String>,
-    history_index: usize,
+    history_index: usize
 }
 
 impl Castor {
@@ -28,7 +29,7 @@ impl Castor {
         Castor {
             current_url: String::from(DEFAULT_URL),
             history: vec![String::from(DEFAULT_URL)],
-            history_index: 0,
+            history_index: 0
         }
     }
 }
@@ -135,10 +136,10 @@ fn build_ui(app: &Application) -> Result<ApplicationWindow> {
     // we'll use this when the user clicks on a links
     let (tx, rx) = MainContext::channel::<String>(PRIORITY_DEFAULT);
 
-    window.connect_show(clone!(@strong client, @weak page_content, @weak window, @strong tx => move |_w| {
+    window.connect_show(clone!(@strong client, @strong castor_state, @weak page_content, @weak window, @strong tx => move |_w| {
         let main_context = MainContext::default();
-        main_context.spawn_local(clone!(@weak client, @weak page_content, @strong tx => async move {
-            load_page(&mut client.borrow_mut(), String::from(DEFAULT_URL), "", &page_content, &window, tx.clone()).await;
+        main_context.spawn_local(clone!(@weak client, @strong castor_state, @weak page_content, @strong tx => async move {
+            load_page(&mut client.borrow_mut(), &mut castor_state.borrow_mut(), String::from(DEFAULT_URL), &page_content, &window, tx.clone()).await;
         }));
     }));
 
@@ -149,7 +150,7 @@ fn build_ui(app: &Application) -> Result<ApplicationWindow> {
 
         let main_context = MainContext::default();
         main_context.spawn_local(clone!(@strong castor_state, @strong client, @weak page_content, @weak window, @strong tx, @weak entry => async move {
-            let ret = load_page(&mut client.borrow_mut(), url, &castor_state.borrow().current_url, &page_content, &window, tx.clone()).await;
+            let ret = load_page(&mut client.borrow_mut(), &mut castor_state.borrow_mut(), url, &page_content, &window, tx.clone()).await;
             if let Some(url) = ret{
                 castor_state.borrow_mut().current_url = url;
                 entry.set_text(&castor_state.borrow().current_url);
@@ -174,7 +175,7 @@ fn build_ui(app: &Application) -> Result<ApplicationWindow> {
 
         let main_context = MainContext::default();
         main_context.spawn_local(clone!(@strong castor_state, @strong client, @weak page_content, @weak window, @strong tx, @weak url_bar => async move {
-            let ret = load_page(&mut client.borrow_mut(), url, &castor_state.borrow().current_url, &page_content, &window, tx.clone()).await;
+            let ret = load_page(&mut client.borrow_mut(), &mut castor_state.borrow_mut(), url, &page_content, &window, tx.clone()).await;
             if let Some(url) = ret{
                 castor_state.borrow_mut().current_url = url;
                 url_bar.set_text(&castor_state.borrow().current_url);
@@ -193,7 +194,7 @@ fn build_ui(app: &Application) -> Result<ApplicationWindow> {
 
         let main_context = MainContext::default();
         main_context.spawn_local(clone!(@strong castor_state, @strong client, @weak page_content, @weak window, @strong tx, @weak url_bar => async move {
-            let ret = load_page(&mut client.borrow_mut(), url, &castor_state.borrow().current_url, &page_content, &window, tx.clone()).await;
+            let ret = load_page(&mut client.borrow_mut(), &mut castor_state.borrow_mut(), url, &page_content, &window, tx.clone()).await;
             if let Some(url) = ret{
                 castor_state.borrow_mut().current_url = url;
                 url_bar.set_text(&castor_state.borrow().current_url);
@@ -205,7 +206,7 @@ fn build_ui(app: &Application) -> Result<ApplicationWindow> {
         let main_context = MainContext::default();
         main_context.spawn_local(clone!(@strong castor_state, @strong client, @weak page_content, @weak window, @strong tx => async move {
             let current_url = &castor_state.borrow().current_url;
-            load_page(&mut client.borrow_mut(), current_url.clone(), current_url, &page_content, &window, tx.clone()).await;
+            load_page(&mut client.borrow_mut(), &mut castor_state.borrow_mut(), current_url.clone(), &page_content, &window, tx.clone()).await;
         }));
     }));
 
@@ -215,7 +216,7 @@ fn build_ui(app: &Application) -> Result<ApplicationWindow> {
 
         let main_context = MainContext::default();
         main_context.spawn_local(clone!(@strong castor_state, @strong client, @weak page_content, @weak window, @strong tx, @weak url_bar => async move {
-            let ret = load_page(&mut client.borrow_mut(), url, &castor_state.borrow().current_url, &page_content, &window, tx.clone()).await;
+            let ret = load_page(&mut client.borrow_mut(), &mut castor_state.borrow_mut(), url, &page_content, &window, tx.clone()).await;
             if let Some(url) = ret{
                 castor_state.borrow_mut().current_url = url;
                 url_bar.set_text(&castor_state.borrow().current_url);
@@ -346,7 +347,7 @@ impl std::fmt::Display for LoadPageError {
                 format!("Permanent failure: {code}")
             },
             LoadPageError::CertFail(code) => {
-                format!("Certificate failure: {code}")
+                format!("Certificate failure: {code}\nCertificates are currently not supported")
             }
         };
         write!(f, "{}", to_print)
@@ -358,16 +359,16 @@ impl std::fmt::Display for LoadPageError {
 #[async_recursion(?Send)]
 async fn load_page(
     client: &mut gemini::Client,
+    state: &mut Castor,
     mut url: String,
-    current_url: &str,
     text_view: &TextView,
     window: &ApplicationWindow,
     link_tx: Sender<String>
 ) -> Option<String> {
     if let Err(err) = url::Url::parse(&url) {
         let mut new_url = None;
-        if err == url::ParseError::RelativeUrlWithoutBase {
-            let to_join = url::Url::parse(current_url).unwrap();
+        if matches!(err, url::ParseError::RelativeUrlWithoutBase) {
+            let to_join = url::Url::parse(&state.current_url).unwrap();
             if let Ok(joined) = to_join.join(&url) {
                 new_url = Some(joined.to_string())
             };
@@ -377,7 +378,7 @@ async fn load_page(
             Some(new_url) => url = new_url,
             None => {
                 load_page_error_modal(&window, LoadPageError::InvalidUrl(err)).await;
-                return None
+                return None;
             }
         }
     }
@@ -413,43 +414,49 @@ async fn load_page(
                     _ => unreachable!()
                 };
                 let url = utf8_percent_encode(&url, percent_encoding::NON_ALPHANUMERIC).to_string();
-                load_page(client, url, current_url, text_view, window, link_tx).await;
+                load_page(client, state, url, text_view, window, link_tx).await
             }
             gemini::header::StatusCode::Success => {
                 if response.header.meta.starts_with("text/plaintext") {
-                    let bytes = match &response.body {
-                        Some(body) => body,
+                    match &response.body {
+                        Some(body) => {
+                            let text = String::from_utf8_lossy(body);
+                            buffer.set_text("");
+                            buffer.insert_with_tags_by_name(&mut buffer.end_iter(), &text, &["plaintext"]);
+                            Some(url)
+                        },
                         None => {
                             load_page_error_modal(window, LoadPageError::EmptyBody(response)).await;
-                            return None;
+                            None
                         }
-                    };
-                    let text = String::from_utf8_lossy(bytes);
-                    buffer.set_text("");
-                    buffer.insert_with_tags_by_name(&mut buffer.end_iter(), &text, &["plaintext"])
+                    }
                 } else if response.header.meta.starts_with("text/gemini") || response.header.meta.is_empty() {
-                    let bytes = match &response.body {
-                        Some(body) => body,
+                    match &response.body {
+                        Some(body) => {
+                            let text = String::from_utf8_lossy(&body);
+                            match Gemtext::new(&text) {
+                                Ok(gemtext) => {
+                                    gemtext_to_text_buffer(gemtext, &text_view, link_tx);
+                                    Some(url)
+                                },
+                                Err(err) => {
+                                    load_page_error_modal(
+                                        window,
+                                        LoadPageError::GemtextParsing(err, response),
+                                    )
+                                    .await;
+                                    None
+                                }
+                            }
+                        },
                         None => {
                             load_page_error_modal(window, LoadPageError::EmptyBody(response)).await;
-                            return None;
+                            None
                         }
-                    };
-                    let text = String::from_utf8_lossy(&bytes);
-                    let gemtext = match Gemtext::new(&text) {
-                        Ok(gemtext) => gemtext,
-                        Err(err) => {
-                            load_page_error_modal(
-                                window,
-                                LoadPageError::GemtextParsing(err, response),
-                            )
-                            .await;
-                            return None;
-                        }
-                    };
-                    gemtext_to_text_buffer(gemtext, &text_view, link_tx);
+                    }
                 } else {
                     load_page_error_modal(window, LoadPageError::NotGemtext(response)).await;
+                    None
                 }
             }
             gemini::header::StatusCode::Redirect(code) => {
@@ -475,33 +482,31 @@ async fn load_page(
                         user_response
                     }
                 };
-                match user_response {
-                    gtk::ResponseType::Yes => {
-                        return load_page(client, response.header.meta, current_url, text_view, window, link_tx).await;
-                    }
-                    gtk::ResponseType::No | gtk::ResponseType::DeleteEvent => return None,
-                    _ => unreachable!(),
+                if matches!(user_response, gtk::ResponseType::Yes) {
+                    load_page(client, state, response.header.meta, text_view, window, link_tx).await
+                }
+                else {
+                    None
                 }
             }
             gemini::header::StatusCode::FailTemporary(code) => {
                 load_page_error_modal(window, LoadPageError::FailTemporary(code)).await;
-                return None;
+                None
             },
             gemini::header::StatusCode::FailPermanent(code) => {
                 load_page_error_modal(window, LoadPageError::FailPermanent(code)).await;
-                return None;
+                None
             },
             gemini::header::StatusCode::CertFail(code) => {
                 load_page_error_modal(window, LoadPageError::CertFail(code)).await;
-                return None;
+                None
             },
         },
         Err(e) => {
             load_page_error_modal(window, LoadPageError::RequestFailure(e)).await;
+            None
         }
     }
-
-    Some(url)
 }
 
 async fn load_page_error_modal(window: &ApplicationWindow, err: LoadPageError) {
