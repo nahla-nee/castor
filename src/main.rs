@@ -42,7 +42,7 @@ fn main() {
         let window = match build_ui(&app) {
             Ok(window) => window,
             Err(e) => {
-                eprintln!("Error occured while creating ui: {}", e);
+                eprintln!("Error occurred while creating ui: {}", e);
                 return;
             }
         };
@@ -138,7 +138,7 @@ fn build_ui(app: &Application) -> Result<ApplicationWindow> {
     window.connect_show(clone!(@strong client, @strong castor_state, @weak page_content, @weak window, @strong tx => move |_w| {
         let main_context = MainContext::default();
         main_context.spawn_local(clone!(@weak client, @strong castor_state, @weak page_content, @strong tx => async move {
-            load_page(&mut client.borrow_mut(), &mut castor_state.borrow_mut(), String::from(DEFAULT_URL), &page_content, &window, tx.clone()).await;
+            load_page(&mut client.borrow_mut(), castor_state.borrow_mut().current_url.clone(), String::from(DEFAULT_URL), &page_content, &window, tx.clone()).await;
         }));
     }));
 
@@ -151,7 +151,7 @@ fn build_ui(app: &Application) -> Result<ApplicationWindow> {
         let main_context = MainContext::default();
         main_context.spawn_local(clone!(@strong castor_state, @strong client, @weak page_content,
             @weak window, @strong tx, @weak entry => async move {
-            let ret = load_page(&mut client.borrow_mut(), &mut castor_state.borrow_mut(), url, &page_content, &window, tx.clone()).await;
+            let ret = load_page(&mut client.borrow_mut(), castor_state.borrow_mut().current_url.clone(), url, &page_content, &window, tx.clone()).await;
             if let Some(url) = ret{
                 castor_state.borrow_mut().current_url = url;
                 entry.set_text(&castor_state.borrow().current_url);
@@ -178,7 +178,7 @@ fn build_ui(app: &Application) -> Result<ApplicationWindow> {
         let main_context = MainContext::default();
         main_context.spawn_local(clone!(@strong castor_state, @strong client, @weak page_content,
             @weak window, @strong tx, @weak url_bar => async move {
-            let ret = load_page(&mut client.borrow_mut(), &mut castor_state.borrow_mut(), url, &page_content, &window, tx.clone()).await;
+            let ret = load_page(&mut client.borrow_mut(), castor_state.borrow_mut().current_url.clone(), url, &page_content, &window, tx.clone()).await;
             if let Some(url) = ret{
                 castor_state.borrow_mut().current_url = url;
                 url_bar.set_text(&castor_state.borrow().current_url);
@@ -199,7 +199,7 @@ fn build_ui(app: &Application) -> Result<ApplicationWindow> {
         let main_context = MainContext::default();
         main_context.spawn_local(clone!(@strong castor_state, @strong client, @weak page_content,
             @weak window, @strong tx, @weak url_bar => async move {
-            let ret = load_page(&mut client.borrow_mut(), &mut castor_state.borrow_mut(), url, &page_content, &window, tx.clone()).await;
+            let ret = load_page(&mut client.borrow_mut(), castor_state.borrow_mut().current_url.clone(), url, &page_content, &window, tx.clone()).await;
             if let Some(url) = ret{
                 castor_state.borrow_mut().current_url = url;
                 url_bar.set_text(&castor_state.borrow().current_url);
@@ -211,8 +211,8 @@ fn build_ui(app: &Application) -> Result<ApplicationWindow> {
         @weak window, @strong tx =>  move |_| {
         let main_context = MainContext::default();
         main_context.spawn_local(clone!(@strong castor_state, @strong client, @weak page_content, @weak window, @strong tx => async move {
-            let current_url = &castor_state.borrow().current_url;
-            load_page(&mut client.borrow_mut(), &mut castor_state.borrow_mut(), current_url.clone(), &page_content, &window, tx.clone()).await;
+            let current_url = castor_state.borrow().current_url.clone();
+            load_page(&mut client.borrow_mut(), current_url.clone(), current_url, &page_content, &window, tx.clone()).await;
         }));
     }));
 
@@ -224,7 +224,7 @@ fn build_ui(app: &Application) -> Result<ApplicationWindow> {
         let main_context = MainContext::default();
         main_context.spawn_local(clone!(@strong castor_state, @strong client, @weak page_content,
             @weak window, @strong tx, @weak url_bar => async move {
-            let ret = load_page(&mut client.borrow_mut(), &mut castor_state.borrow_mut(), url, &page_content, &window, tx.clone()).await;
+            let ret = load_page(&mut client.borrow_mut(), castor_state.borrow_mut().current_url.clone(), url, &page_content, &window, tx.clone()).await;
             if let Some(url) = ret{
                 castor_state.borrow_mut().current_url = url;
                 url_bar.set_text(&castor_state.borrow().current_url);
@@ -308,7 +308,7 @@ impl std::fmt::Display for LoadPageError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let to_print = match self {
             LoadPageError::RequestFailure(err) => {
-                format!("Page requgest failed with error: {err}")
+                format!("Page request failed with error: {err}")
             }
             LoadPageError::EmptyBody(response) => {
                 match response.header.status {
@@ -363,7 +363,7 @@ impl std::fmt::Display for LoadPageError {
 #[async_recursion(?Send)]
 async fn load_page(
     client: &mut gemini::Client,
-    state: &mut Castor,
+    current_url: String,
     mut url: String,
     text_view: &TextView,
     window: &ApplicationWindow,
@@ -372,18 +372,18 @@ async fn load_page(
     if let Err(err) = url::Url::parse(&url) {
         let mut new_url = None;
         if matches!(err, url::ParseError::RelativeUrlWithoutBase) {
-            let to_join = url::Url::parse(&state.current_url).unwrap();
+            let to_join = url::Url::parse(&current_url).unwrap();
             if let Ok(joined) = to_join.join(&url) {
                 new_url = Some(joined.to_string())
             };
         }
 
-        match new_url {
-            Some(new_url) => url = new_url,
-            None => {
-                load_page_error_modal(&window, LoadPageError::InvalidUrl(err)).await;
-                return None;
-            }
+        if new_url.is_some() {
+            url = new_url.unwrap();
+        }
+        else {
+            load_page_error_modal(&window, LoadPageError::InvalidUrl(err)).await;
+            return None;
         }
     }
 
@@ -418,7 +418,7 @@ async fn load_page(
                         _ => unreachable!(),
                     };
                 let url = utf8_percent_encode(&url, percent_encoding::NON_ALPHANUMERIC).to_string();
-                load_page(client, state, url, text_view, window, link_tx).await
+                load_page(client, current_url, url, text_view, window, link_tx).await
             }
             gemini::header::StatusCode::Success => {
                 if response.header.meta.starts_with("text/plaintext") {
@@ -495,7 +495,7 @@ async fn load_page(
                 if matches!(user_response, gtk::ResponseType::Yes) {
                     load_page(
                         client,
-                        state,
+                        current_url,
                         response.header.meta,
                         text_view,
                         window,
