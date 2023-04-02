@@ -7,7 +7,7 @@ use anyhow::{Context, Result};
 use async_recursion::async_recursion;
 use glib::{clone, MainContext, Sender, PRIORITY_DEFAULT};
 use gtk::{
-    prelude::*, Builder, Button, ButtonsType, Entry, MessageDialog, Orientation, ScrolledWindow, TextBuffer,
+    prelude::*, Builder, Button, ButtonsType, Entry, MessageDialog, TextBuffer,
     TextChildAnchor, TextTag, TextTagTable, TextView,
 };
 use gtk::{Application, ApplicationWindow};
