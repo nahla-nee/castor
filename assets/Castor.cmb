@@ -1,0 +1,35 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<!DOCTYPE cambalache-project SYSTEM "cambalache-project.dtd">
+<cambalache-project version="0.10.3" target_tk="gtk-4.0">
+  <ui>
+	(1,None,"castor.ui","castor.ui",None,None,None,None,None,None)
+  </ui>
+  <object>
+	(1,1,"GtkApplicationWindow","window",None,None,None,None,None),
+	(1,7,"GtkBox",None,1,None,None,None,1),
+	(1,8,"GtkBox",None,7,None,None,None,None),
+	(1,9,"GtkButton","back_button",8,None,None,None,None),
+	(1,10,"GtkButton","forward_button",8,None,None,None,1),
+	(1,11,"GtkButton","refresh_button",8,None,None,None,2),
+	(1,12,"GtkEntry","url_bar",8,None,None,None,3),
+	(1,13,"GtkScrolledWindow","scroll",7,None,None,None,1),
+	(1,14,"GtkTextView","page_content",13,None,None,None,None)
+  </object>
+  <object_property>
+	(1,1,"GtkWindow","default-height","600",None,None,None,None,None),
+	(1,1,"GtkWindow","default-width","800",None,None,None,None,None),
+	(1,7,"GtkOrientable","orientation","vertical",None,None,None,None,None),
+	(1,7,"GtkWidget","hexpand","True",None,None,None,None,None),
+	(1,7,"GtkWidget","vexpand","True",None,None,None,None,None),
+	(1,8,"GtkWidget","hexpand","True",None,None,None,None,None),
+	(1,8,"GtkWidget","valign","start",None,None,None,None,None),
+	(1,9,"GtkButton","label","←",None,None,None,None,None),
+	(1,10,"GtkButton","label","→",None,None,None,None,None),
+	(1,11,"GtkButton","label","⟳",None,None,None,None,None),
+	(1,12,"GtkWidget","hexpand","True",None,None,None,None,None),
+	(1,13,"GtkWidget","hexpand","True",None,None,None,None,None),
+	(1,13,"GtkWidget","vexpand","True",None,None,None,None,None),
+	(1,14,"GtkWidget","hexpand","True",None,None,None,None,None),
+	(1,14,"GtkWidget","vexpand","True",None,None,None,None,None)
+  </object_property>
+</cambalache-project>

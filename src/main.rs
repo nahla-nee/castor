@@ -7,7 +7,7 @@ use anyhow::{Context, Result};
 use async_recursion::async_recursion;
 use glib::{clone, MainContext, Sender, PRIORITY_DEFAULT};
 use gtk::{
-    prelude::*, Button, ButtonsType, Entry, MessageDialog, Orientation, ScrolledWindow, TextBuffer,
+    prelude::*, Builder, Button, ButtonsType, Entry, MessageDialog, Orientation, ScrolledWindow, TextBuffer,
     TextChildAnchor, TextTag, TextTagTable, TextView,
 };
 use gtk::{Application, ApplicationWindow};
@@ -58,53 +58,16 @@ fn build_ui(app: &Application) -> Result<ApplicationWindow> {
     ));
     let castor_state = Rc::new(RefCell::new(Castor::new()));
 
-    let window = ApplicationWindow::builder()
-        .application(app)
-        .default_width(800)
-        .default_height(600)
-        .title("Castor")
-        .build();
+    let ui_src = include_str!("../assets/castor.ui");
+    let builder = Builder::from_string(ui_src);
 
-    let window_content = gtk::Box::new(Orientation::Vertical, 0);
-    let control_bar = gtk::Box::builder()
-        .orientation(Orientation::Horizontal)
-        .spacing(5)
-        .margin_start(5)
-        .margin_end(5)
-        .margin_top(5)
-        .margin_bottom(5)
-        .vexpand(false)
-        .build();
-
-    let back_button = Button::builder().label("←").sensitive(false).build();
-    let forward_button = Button::builder().label("→").sensitive(false).build();
-    let refresh_button = Button::with_label("⟳");
-    let url_bar = Entry::builder().text(DEFAULT_URL).hexpand(true).build();
-
-    control_bar.append(&back_button);
-    control_bar.append(&forward_button);
-    control_bar.append(&refresh_button);
-    control_bar.append(&url_bar);
-
-    let scroll = ScrolledWindow::builder()
-        .hexpand(true)
-        .vexpand(true)
-        .build();
-
-    let page_content = TextView::builder()
-        .wrap_mode(gtk::WrapMode::WordChar)
-        .margin_start(5)
-        .editable(false)
-        .cursor_visible(false)
-        .monospace(true)
-        .build();
-
-    scroll.set_child(Some(&page_content));
-
-    window_content.append(&control_bar);
-    window_content.append(&scroll);
-
-    window.set_child(Some(&window_content));
+    let window: ApplicationWindow = builder.object("window").expect("Couldn't get window");
+    window.set_application(Some(app));
+    let back_button: Button = builder.object("back_button").expect("Couldn't get back button");
+    let forward_button: Button = builder.object("forward_button").expect("Couldn't get forward button");
+    let refresh_button: Button = builder.object("refresh_button").expect("Couldn't get refresh button");
+    let url_bar: Entry = builder.object("url_bar").expect("Couldn't get url bar");
+    let page_content: TextView = builder.object("page_content").expect("Couldn't get page content");
 
     let tag_table = TextTagTable::new();
     tag_table.add(&TextTag::builder().name("plaintext").build());
